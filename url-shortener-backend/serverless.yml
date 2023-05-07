@@ -15,7 +15,6 @@ provider:
       - ${file(src/iam/URLTableIAM.yml):URLTableIAM}
       - ${file(src/iam/CloudWatchIAM.yml):CloudWatchIAM}
 
-
 functions:
   shortenUrl:
     handler: src/handlers/shorten_url.create_short_url
@@ -46,4 +45,5 @@ custom:
   ShortURLLambda:
     arn: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:user-service-${self:provider.stage}-shortenUrl
 
-  BaseURL: !Sub 'https://${HttpApi}.execute-api.${aws:region}.amazonaws.com/${self:provider.stage}'
+  BaseURL: !Sub 'https://${HttpApi}.execute-api.${aws:region}.amazonaws.com'
+

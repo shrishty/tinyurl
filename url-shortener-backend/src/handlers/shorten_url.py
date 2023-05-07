@@ -1,8 +1,11 @@
 import json
 import boto3
-import shortuuid
 import os
 import datetime
+import uuid
+import random
+import string
+
 from typing import Any, Dict
 
 URL_TABLE_NAME = os.getenv('URL_TABLE_NAME')
@@ -11,28 +14,33 @@ dynamodb = boto3.resource('dynamodb')
 url_table = dynamodb.Table(URL_TABLE_NAME)
 
 def create_short_url(event: Dict[str, Any], context) -> Dict[str, Any]:
+    print(event)
     request_body = json.loads(event['body'])
     long_url = request_body['longUrl']
-    id = shortuuid.uuid()
-    short_url = shortuuid.uuid()[0:7]
+    id = str(uuid.uuid4())
+    short_id = ''.join(random.choices(string.ascii_lowercase, k=5))
+    short_url = f'{BASE_URL}/tinyurl/{short_id}'
     creation_time = datetime.datetime.now()
     ttl = (creation_time + datetime.timedelta(days=7)).timestamp()
 
     url_table.put_item(
         Item={
-            'id': id,
+            'PK': short_id,
+            'SK': short_id,
             'longUrl': long_url,
             'shortUrl': short_url,
-            'creationTime': creation_time,
-            'ttl': ttl
+            'creationTime': str(creation_time.isoformat()),
+            'ttl': int(ttl)
         }
     )
     body = {
         "baseUrl": BASE_URL,
         "shortUrl": short_url,
         "longUrl": long_url,
-        "expirationTimeIso": creation_time.isoformat()
+        "expirationTimeIso": str(creation_time.isoformat())
     }
+
+    print(f"the response body is: {body}")
 
     response = {
         "statusCode": 200,
@@ -42,12 +50,23 @@ def create_short_url(event: Dict[str, Any], context) -> Dict[str, Any]:
     return response
 
 def get_long_url(event: Dict[str, Any], context) -> Dict[str, Any]:
+    short_id = event['pathParameters']['id']
+    response = url_table.get_item(
+        Key={
+            'PK': short_id,
+            'SK': short_id,
+        }
+    )
+    item = response.get('Item', {})
     return {
         "statusCode": 302,
         "headers": {
-            "Location": "https://www.google.com"
+            "Location": item['longUrl']
         },
         "body": json.dumps({
-            'event': event
+            'longUrl': item['longUrl'],
+            'shortUrl': item['shortUrl'],
+            'creationTime': item['creationTime'],
+            'ttl': int(item['ttl'])
         })
     }
