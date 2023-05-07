@@ -1,0 +1,49 @@
+service: url-shortener-backend
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: ${opt:stage, 'dev'}
+  region: 'us-east-1'
+  environment:
+    URL_TABLE_NAME: ${self:custom.URLTable.name}
+    REGION: ${self:provider.region}
+    SERVICE_NAME: ${self:service}
+    BASE_URL: ${self:custom.BaseURL}
+  iamRoleStatements:
+      - ${file(src/iam/URLTableIAM.yml):URLTableIAM}
+      - ${file(src/iam/CloudWatchIAM.yml):CloudWatchIAM}
+
+
+functions:
+  shortenUrl:
+    handler: src/handlers/shorten_url.create_short_url
+    events:
+      - httpApi:
+          path: /tinyurl/create
+          method: post
+  getLongUrl:
+    handler: src/handlers/shorten_url.get_long_url
+    events:
+      - httpApi:
+          path: /tinyurl/{id}
+          method: get
+
+resources:
+  Resources:
+    URLTable: ${file(src/resources/URLTable.yml):URLTable}
+  
+  Outputs:
+    URLTableArn: ${file(src/resources/URLTable.yml):Outputs.URLTableArn}
+    URLTableName: ${file(src/resources/URLTable.yml):Outputs.URLTableName}
+
+custom:
+  URLTable:
+    name: !Ref URLTable
+    arn: !GetAtt URLTable.Arn
+
+  ShortURLLambda:
+    arn: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:user-service-${self:provider.stage}-shortenUrl
+
+  BaseURL: !Sub 'https://${HttpApi}.execute-api.${aws:region}.amazonaws.com/${self:provider.stage}'
